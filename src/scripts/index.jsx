@@ -65,6 +65,8 @@ class Joyride extends React.Component {
     resizeDebounce: PropTypes.bool,
     resizeDebounceDelay: PropTypes.number,
     run: PropTypes.bool,
+    scrollDebounce: PropTypes.bool,
+    scrollDebounceDelay: PropTypes.number,
     scrollOffset: PropTypes.number,
     scrollToFirstStep: PropTypes.bool,
     scrollToSteps: PropTypes.bool,
@@ -95,6 +97,8 @@ class Joyride extends React.Component {
     offsetParentSelector: 'body',
     resizeDebounce: false,
     resizeDebounceDelay: 200,
+    scrollDebounce: false,
+    scrollDebounceDelay: 200,
     run: false,
     scrollOffset: 20,
     scrollToFirstStep: false,
@@ -115,6 +119,8 @@ class Joyride extends React.Component {
       keyboardNavigation,
       resizeDebounce,
       resizeDebounceDelay,
+      scrollDebounce,
+      scrollDebounceDelay,
       run,
       steps,
       type
@@ -148,6 +154,24 @@ class Joyride extends React.Component {
       };
     }
     window.addEventListener('resize', this.listeners.resize);
+
+    if (scrollDebounce) {
+      let timeoutId;
+
+      this.listeners.scroll = () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          timeoutId = null;
+          this.calcPlacement();
+        }, scrollDebounceDelay);
+      };
+    }
+    else {
+      this.listeners.scroll = () => {
+        this.calcPlacement();
+      };
+    }
+    window.addEventListener('scroll', this.listeners.scroll);
 
     /* istanbul ignore else */
     if (keyboardNavigation && type === 'continuous') {
@@ -393,6 +417,7 @@ class Joyride extends React.Component {
 
   componentWillUnmount() {
     window.removeEventListener('resize', this.listeners.resize);
+    window.removeEventListener('scroll', this.listeners.resize);
 
     /* istanbul ignore else */
     if (this.listeners.keyboard) {
