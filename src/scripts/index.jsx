@@ -123,6 +123,7 @@ class Joyride extends React.Component {
       scrollDebounceDelay,
       run,
       steps,
+      stepIndex,
       type
     } = this.props;
 
@@ -134,7 +135,7 @@ class Joyride extends React.Component {
 
     const stepsAreValid = this.checkStepsValidity(steps);
     if (steps && stepsAreValid && run) {
-      this.start(autoStart);
+      this.start(autoStart, steps, stepIndex);
     }
 
     if (resizeDebounce) {
@@ -817,9 +818,17 @@ class Joyride extends React.Component {
       if (intKey === 27) {
         this.toggleTooltip({ show: false, index: index + 1, action: 'esc' });
       }
-      else if ([13, 32].indexOf(intKey) > -1) {
+      else if ([13, 32, 39, 40].indexOf(intKey) > -1) {
         hasSteps = Boolean(steps[index + 1]);
         this.toggleTooltip({ show: hasSteps, index: index + 1, action: 'next' });
+      }
+      else if ([8, 37, 38].indexOf(intKey) > -1) {
+        if (index - 1 < 0) {
+          return;
+        }
+
+        hasSteps = Boolean(steps[index - 1]);
+        this.toggleTooltip({ show: hasSteps, index: index - 1, action: 'back' });
       }
     }
   };
