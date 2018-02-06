@@ -203,6 +203,9 @@ class Joyride extends React.Component {
     let shouldStart = false;
     let didStop = false;
 
+    const isNextStep = nextProps.stepIndex > stepIndex;
+    const nextMountedStepIndex = this.getMountedStepIndex(nextProps.stepIndex, isNextStep === false);
+
     if (stepsChanged && this.checkStepsValidity(nextProps.steps)) {
       // Removed all steps, so reset
       if (!nextProps.steps || !nextProps.steps.length) {
@@ -233,18 +236,18 @@ class Joyride extends React.Component {
 
     /* istanbul ignore else */
     if (stepIndexChanged) {
-      const hasStep = nextProps.steps[nextProps.stepIndex];
+      const hasStep = nextProps.steps[nextMountedStepIndex];
       const shouldDisplay = hasStep && nextProps.autoStart;
       if (runChanged && shouldStart) {
-        this.start(nextProps.autoStart, nextProps.steps, nextProps.stepIndex);
+        this.start(nextProps.autoStart, nextProps.steps, nextMountedStepIndex);
       }
       // Next prop is set to run, and the index has changed, but for some reason joyride is not running
       // (maybe this is because of a target not mounted, and the app wants to skip to another step)
       else if (nextProps.run && !isRunning) {
-        this.start(nextProps.autoStart, nextProps.steps, nextProps.stepIndex);
+        this.start(nextProps.autoStart, nextProps.steps, nextMountedStepIndex);
       }
       else if (!didStop) {
-        this.toggleTooltip({ show: shouldDisplay, index: nextProps.stepIndex, steps: nextProps.steps, action: 'jump' });
+        this.toggleTooltip({ show: shouldDisplay, index: nextMountedStepIndex, steps: nextProps.steps, action: 'jump' });
       }
     }
     // Did not change the index, but need to start up the joyride
@@ -452,7 +455,8 @@ class Joyride extends React.Component {
    * @param {number} [startIndex] - Optional step index to start joyride at
    */
   start(autorun, steps = this.props.steps, startIndex = this.state.index) {
-    const hasMountedTarget = Boolean(this.getStepTargetElement(steps[startIndex]));
+    const mountedStartIndex = this.getMountedStepIndex(startIndex);
+    const hasMountedTarget = Boolean(this.getStepTargetElement(steps[mountedStartIndex]));
     const shouldRenderTooltip = (autorun === true) && hasMountedTarget;
 
     logger({
@@ -463,7 +467,7 @@ class Joyride extends React.Component {
 
     this.setState({
       action: 'start',
-      index: startIndex,
+      index: mountedStartIndex,
       isRunning: Boolean(steps.length) && hasMountedTarget,
       shouldRenderTooltip,
       shouldRun: !steps.length,
@@ -493,7 +497,7 @@ class Joyride extends React.Component {
   next() {
     const { index, shouldRenderTooltip } = this.state;
     const { steps } = this.props;
-    const nextIndex = index + 1;
+    const nextIndex = this.getMountedStepIndex(index + 1);
 
     const shouldDisplay = Boolean(steps[nextIndex]) && shouldRenderTooltip;
 
@@ -511,7 +515,7 @@ class Joyride extends React.Component {
   back() {
     const { index, shouldRenderTooltip } = this.state;
     const { steps } = this.props;
-    const previousIndex = index - 1;
+    const previousIndex = this.getMountedStepIndex(index, true);
 
     const shouldDisplay = Boolean(steps[previousIndex]) && shouldRenderTooltip;
 
@@ -716,6 +720,34 @@ class Joyride extends React.Component {
     }
 
     return el;
+  }
+
+  getMountedStepIndex(preferredStepIndex, reverse) {
+    let preferred =  preferredStepIndex;
+
+    if (preferredStepIndex < 0) {
+      preferred = 0;
+    }
+    else if (preferredStepIndex >= this.props.steps.length) {
+      preferred = 9999;
+    }
+
+    let stepIndexes = this.props.steps.map((step, index) => ({
+      index,
+      found: !!document.querySelector(sanitizeSelector(step.selector)),
+      isValidIndex: !reverse ? index >= preferred : index <= preferred,
+    })).filter(step => step.found);
+
+    if (reverse) {
+      stepIndexes = [...stepIndexes].reverse();
+    }
+
+    const calcStepIndex = stepIndexes.filter(step => step.isValidIndex).map(step => step.index)[0];
+    const actualStepIndex = typeof calcStepIndex !== 'undefined' ? calcStepIndex : preferred;
+
+    // console.log(JSON.stringify({ preferredStepIndex, actualStepIndex, reverse: !!reverse, stepIndexes }, null, 2));
+
+    return actualStepIndex;
   }
 
   /**
@@ -968,12 +1000,14 @@ class Joyride extends React.Component {
    * @param {Array} [options.steps] - The array of step objects that is going to be rendered
    */
   toggleTooltip({ show, index = this.state.index, action, steps = this.props.steps }) {
-    const nextStep = steps[index];
+    const isPreviousStep = action === 'back';
+    const nextMountedStepIndex = this.getMountedStepIndex(index, isPreviousStep);
+    const nextStep = steps[nextMountedStepIndex];
     const hasMountedTarget = Boolean(this.getStepTargetElement(nextStep));
 
     this.setState({
       action,
-      index,
+      index: nextMountedStepIndex,
       // Stop playing if there is no next step or can't find the target
       isRunning: (nextStep && hasMountedTarget) ? this.state.isRunning : false,
       // If we are not showing now, or there is no target, we'll need to redraw eventually
